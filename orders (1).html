@@ -1,0 +1,1482 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="description" content="Manage your Breakfastclub orders — track, return, replace, and more." />
+  <title>My Orders — Breakfastclub</title>
+  <link rel="icon" href="https://breakfastclub.co.in/favicon.ico" />
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700&family=Plus+Jakarta+Sans:wght@300;400;500;600;700&display=swap" rel="stylesheet" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+  <script src="https://checkout.razorpay.com/v1/checkout.js"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            display: ['Bricolage Grotesque', 'sans-serif'],
+            sans: ['Plus Jakarta Sans', 'sans-serif'],
+          },
+          colors: {
+            brand: { 50:'#eff6ff',100:'#dbeafe',200:'#bfdbfe',500:'#3b82f6',600:'#2563eb',700:'#1d4ed8',800:'#1e40af',900:'#1e3a8a' },
+          },
+        }
+      }
+    }
+  </script>
+  <style>
+    :root {
+      --primary: #1d4ed8;
+      --primary-hover: #1e40af;
+      --primary-light: #eff6ff;
+      --text-primary: #0f172a;
+      --text-secondary: #475569;
+      --text-muted: #94a3b8;
+      --border: #e2e8f0;
+      --border-light: #f1f5f9;
+      --bg: #ffffff;
+      --bg-subtle: #f8fafc;
+      --radius-card: 18px;
+      --radius-input: 12px;
+      --radius-btn: 10px;
+      --shadow-card: 0 1px 4px rgba(0,0,0,0.05), 0 6px 30px rgba(0,0,0,0.06);
+      --shadow-hover: 0 4px 16px rgba(0,0,0,0.08), 0 16px 48px rgba(0,0,0,0.09);
+    }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Plus Jakarta Sans', sans-serif; background: #ffffff; color: var(--text-primary); -webkit-font-smoothing: antialiased; }
+    .font-display { font-family: 'Bricolage Grotesque', sans-serif; }
+
+    @keyframes fadeIn    { from{opacity:0}to{opacity:1} }
+    @keyframes slideUp   { from{opacity:0;transform:translateY(16px)}to{opacity:1;transform:translateY(0)} }
+    @keyframes scaleIn   { from{opacity:0;transform:scale(.94)}to{opacity:1;transform:scale(1)} }
+    @keyframes shimmer   { from{background-position:-400px 0}to{background-position:400px 0} }
+    @keyframes checkPop  { 0%{transform:scale(0)}60%{transform:scale(1.2)}100%{transform:scale(1)} }
+    @keyframes spin      { to{transform:rotate(360deg)} }
+    @keyframes toastSlide{ from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:translateY(0)} }
+
+    .anim-fade  { animation: fadeIn .2s ease-out both; }
+    .anim-up    { animation: slideUp .25s ease-out both; }
+    .anim-scale { animation: scaleIn .22s ease-out both; }
+
+    .skeleton {
+      background: linear-gradient(90deg,#f1f5f9 25%,#e8edf3 50%,#f1f5f9 75%);
+      background-size: 400px 100%;
+      animation: shimmer 1.4s ease-in-out infinite;
+      border-radius: 8px;
+    }
+
+    .otp-box {
+      width:52px;height:60px;border:2px solid var(--border);border-radius:var(--radius-input);
+      font-size:1.5rem;font-weight:600;text-align:center;outline:none;
+      transition:border-color .15s,box-shadow .15s;background:#fff;color:var(--text-primary);
+    }
+    .otp-box:focus { border-color:var(--primary);box-shadow:0 0 0 3px rgba(29,78,216,.12); }
+    .otp-box.error { border-color:#ef4444; }
+
+    .bc-input {
+      width:100%;height:52px;padding:0 16px;border:1.5px solid var(--border);
+      border-radius:var(--radius-input);font-size:.9375rem;font-family:inherit;
+      color:var(--text-primary);background:#fff;outline:none;
+      transition:border-color .15s,box-shadow .15s;
+    }
+    .bc-input:focus { border-color:var(--primary);box-shadow:0 0 0 3px rgba(29,78,216,.1); }
+    .bc-input::placeholder { color:var(--text-muted); }
+    .bc-input:disabled { background:var(--bg-subtle);cursor:not-allowed; }
+    select.bc-input { appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' viewBox='0 0 24 24' fill='none' stroke='%2394a3b8' stroke-width='2'%3E%3Cpath d='m6 9 6 6 6-6'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 12px center;padding-right:40px;cursor:pointer; }
+    textarea.bc-input { height:auto;padding:14px 16px;resize:vertical; }
+
+    .btn-primary {
+      display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      height:52px;padding:0 28px;background:var(--primary);color:#fff;
+      font-size:.9375rem;font-weight:600;font-family:inherit;
+      border:none;border-radius:var(--radius-btn);cursor:pointer;
+      transition:background .15s,box-shadow .15s,transform .1s;white-space:nowrap;
+    }
+    .btn-primary:hover { background:var(--primary-hover);box-shadow:0 4px 16px rgba(29,78,216,.28); }
+    .btn-primary:active { transform:scale(.98); }
+    .btn-primary:disabled { opacity:.6;cursor:not-allowed;transform:none; }
+
+    .btn-secondary {
+      display:inline-flex;align-items:center;justify-content:center;gap:8px;
+      height:44px;padding:0 20px;background:#fff;color:var(--text-secondary);
+      font-size:.875rem;font-weight:500;font-family:inherit;
+      border:1.5px solid var(--border);border-radius:var(--radius-btn);cursor:pointer;
+      transition:background .15s,border-color .15s,transform .1s;white-space:nowrap;
+    }
+    .btn-secondary:hover { background:var(--bg-subtle);border-color:#cbd5e1; }
+    .btn-secondary:active { transform:scale(.98); }
+    .btn-secondary:disabled { opacity:.5;cursor:not-allowed; }
+
+    .btn-ghost {
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      height:38px;padding:0 14px;background:transparent;color:var(--text-secondary);
+      font-size:.8125rem;font-weight:500;font-family:inherit;border:none;border-radius:8px;
+      cursor:pointer;transition:background .15s,color .15s;white-space:nowrap;
+    }
+    .btn-ghost:hover { background:var(--bg-subtle);color:var(--text-primary); }
+
+    .btn-action {
+      display:inline-flex;align-items:center;justify-content:center;gap:6px;
+      height:36px;padding:0 14px;font-size:.8rem;font-weight:600;font-family:inherit;
+      border-radius:8px;cursor:pointer;transition:background .15s,transform .1s;
+      white-space:nowrap;border:none;
+    }
+    .btn-action:active { transform:scale(.97); }
+    .btn-track   { background:#eff6ff;color:#1d4ed8; } .btn-track:hover   { background:#dbeafe; }
+    .btn-invoice { background:#f8fafc;color:#475569; } .btn-invoice:hover { background:#f1f5f9; }
+    .btn-return  { background:#fff7ed;color:#c2410c; } .btn-return:hover  { background:#ffedd5; }
+    .btn-replace { background:#f0fdf4;color:#15803d; } .btn-replace:hover { background:#dcfce7; }
+    .btn-cancel  { background:#fef2f2;color:#b91c1c; } .btn-cancel:hover  { background:#fee2e2; }
+    .btn-buy     { background:#f0fdf4;color:#15803d; } .btn-buy:hover     { background:#dcfce7; }
+
+    .badge { display:inline-flex;align-items:center;gap:5px;padding:4px 12px;font-size:.75rem;font-weight:600;border-radius:999px;white-space:nowrap; }
+    .badge::before { content:'';width:6px;height:6px;border-radius:50%;background:currentColor;display:block; }
+    .badge-delivered      { background:#f0fdf4;color:#16a34a; }
+    .badge-shipped        { background:#eff6ff;color:#1d4ed8; }
+    .badge-processing     { background:#fffbeb;color:#b45309; }
+    .badge-placed         { background:#f8fafc;color:#64748b; }
+    .badge-cancelled      { background:#fef2f2;color:#dc2626; }
+    .badge-returned       { background:#faf5ff;color:#7c3aed; }
+    .badge-out_for_delivery{ background:#ecfeff;color:#0e7490; }
+
+    .order-card {
+      background:#fff;border:1.5px solid var(--border);border-radius:var(--radius-card);
+      box-shadow:var(--shadow-card);transition:box-shadow .2s,transform .2s,border-color .2s;overflow:hidden;
+    }
+    .order-card:hover { box-shadow:var(--shadow-hover);transform:translateY(-2px);border-color:#cbd5e1; }
+
+    .modal-backdrop {
+      position:fixed;inset:0;background:rgba(15,23,42,.45);backdrop-filter:blur(4px);
+      z-index:50;display:flex;align-items:flex-end;justify-content:center;padding:0;
+    }
+    @media(min-width:768px){ .modal-backdrop{align-items:center;padding:24px;} }
+    .modal-panel {
+      background:#fff;border-radius:24px 24px 0 0;width:100%;max-width:580px;
+      max-height:92vh;overflow-y:auto;animation:slideUp .25s ease-out both;
+    }
+    @media(min-width:768px){ .modal-panel{border-radius:20px;max-height:88vh;} }
+    .modal-panel::-webkit-scrollbar{width:4px;}
+    .modal-panel::-webkit-scrollbar-thumb{background:#e2e8f0;border-radius:2px;}
+
+    .dropzone {
+      border:2px dashed #cbd5e1;border-radius:14px;padding:32px 20px;text-align:center;
+      cursor:pointer;transition:border-color .15s,background .15s;
+    }
+    .dropzone:hover,.dropzone.drag-over { border-color:var(--primary);background:var(--primary-light); }
+
+    .timeline-step { display:flex;align-items:flex-start;gap:16px; }
+    .timeline-dot { width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;z-index:1;font-size:.7rem;font-weight:700; }
+    .timeline-dot.done    { background:#1d4ed8;color:#fff; }
+    .timeline-dot.active  { background:#fff;border:2.5px solid #1d4ed8;color:#1d4ed8;box-shadow:0 0 0 4px rgba(29,78,216,.12); }
+    .timeline-dot.pending { background:#f1f5f9;border:2px solid #e2e8f0;color:#94a3b8; }
+    .timeline-line      { width:2px;height:28px;margin-left:13px;background:#e2e8f0; }
+    .timeline-line.done { background:#1d4ed8; }
+
+    .tab-btn {
+      padding:8px 18px;font-size:.875rem;font-weight:500;font-family:inherit;border:none;
+      border-radius:8px;cursor:pointer;transition:background .15s,color .15s;
+      white-space:nowrap;background:transparent;color:var(--text-secondary);
+    }
+    .tab-btn.active { background:#fff;color:var(--primary);font-weight:600;box-shadow:0 1px 4px rgba(0,0,0,.07); }
+    .tab-btn:hover:not(.active) { background:rgba(255,255,255,.6);color:var(--text-primary); }
+
+    .sticky-header {
+      position:sticky;top:0;z-index:40;background:rgba(255,255,255,.92);
+      backdrop-filter:blur(16px);-webkit-backdrop-filter:blur(16px);
+      border-bottom:1px solid var(--border-light);
+    }
+
+    .search-wrap { position:relative; }
+    .search-wrap svg { position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#94a3b8;pointer-events:none; }
+    .search-input {
+      height:40px;padding:0 14px 0 38px;border:1.5px solid var(--border);border-radius:10px;
+      font-size:.875rem;font-family:inherit;color:var(--text-primary);background:#fff;
+      outline:none;width:100%;max-width:320px;transition:border-color .15s,box-shadow .15s;
+    }
+    .search-input:focus { border-color:var(--primary);box-shadow:0 0 0 3px rgba(29,78,216,.09); }
+    .search-input::placeholder { color:var(--text-muted); }
+
+    .spinner      { width:20px;height:20px;border:2.5px solid rgba(255,255,255,.35);border-top-color:#fff;border-radius:50%;animation:spin .6s linear infinite; }
+    .spinner-dark { width:20px;height:20px;border:2.5px solid rgba(29,78,216,.2);border-top-color:var(--primary);border-radius:50%;animation:spin .6s linear infinite; }
+
+    #toast-container { position:fixed;bottom:24px;left:50%;transform:translateX(-50%);z-index:100;display:flex;flex-direction:column;gap:10px;pointer-events:none;min-width:280px; }
+    .toast { display:flex;align-items:center;gap:12px;padding:14px 20px;background:#0f172a;color:#f8fafc;border-radius:12px;font-size:.875rem;font-weight:500;box-shadow:0 8px 32px rgba(0,0,0,.25);pointer-events:auto;animation:toastSlide .25s ease-out both; }
+    .toast.success { background:#064e3b; }
+    .toast.error   { background:#7f1d1d; }
+
+    .hidden { display:none !important; }
+    .product-img { width:72px;height:72px;object-fit:cover;border-radius:10px;background:#f1f5f9;flex-shrink:0; }
+    .check-anim  { animation:checkPop .3s ease-out both; }
+    label.bc-label { display:block;font-size:.8125rem;font-weight:600;color:#374151;margin-bottom:6px; }
+    .radio-card  { border:1.5px solid var(--border);border-radius:12px;padding:14px 16px;cursor:pointer;transition:border-color .15s,background .15s; }
+    .radio-card:has(input:checked) { border-color:var(--primary);background:var(--primary-light); }
+    .field-error { color:#ef4444;font-size:.78rem;margin-top:4px;font-weight:500; }
+    .thumb-preview { width:72px;height:72px;object-fit:cover;border-radius:8px;border:1.5px solid var(--border); }
+    .active-banner { background:linear-gradient(135deg,#1e3a8a 0%,#1d4ed8 60%,#2563eb 100%); }
+    .login-bg { background:linear-gradient(160deg,#f8fafc 0%,#eff6ff 50%,#f0f9ff 100%);min-height:100vh; }
+    .no-scrollbar::-webkit-scrollbar{display:none;} .no-scrollbar{-ms-overflow-style:none;scrollbar-width:none;}
+    @media(max-width:639px){ .otp-box{width:44px;height:54px;font-size:1.25rem;} }
+  </style>
+</head>
+<body class="bg-white">
+
+<!-- ═══ STATE: LOGIN ═══════════════════════════════════════════════════════ -->
+<div id="state-login" class="login-bg">
+  <nav class="max-w-6xl mx-auto px-6 pt-6 pb-2 flex items-center justify-between">
+    <a href="https://breakfastclub.co.in" class="flex items-center gap-2.5 group">
+      <div class="w-9 h-9 bg-brand-700 rounded-xl flex items-center justify-center shadow-sm group-hover:bg-brand-800 transition-colors">
+        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+      </div>
+      <span class="font-display font-700 text-lg text-slate-900 tracking-tight">Breakfastclub</span>
+    </a>
+    <a href="https://breakfastclub.co.in" class="text-sm font-medium text-slate-500 hover:text-slate-800 transition-colors flex items-center gap-1.5">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>
+      Back to Store
+    </a>
+  </nav>
+
+  <div class="max-w-6xl mx-auto px-6 pt-12 pb-10 lg:pt-20 lg:pb-16">
+    <div class="grid lg:grid-cols-2 gap-12 lg:gap-16 items-center">
+
+      <!-- Left: Copy -->
+      <div class="anim-up order-2 lg:order-1">
+        <div class="inline-flex items-center gap-2 bg-brand-50 text-brand-700 text-xs font-700 px-3.5 py-1.5 rounded-full mb-6 border border-brand-100">
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+          Secure Orders Portal
+        </div>
+        <h1 class="font-display text-4xl lg:text-5xl font-700 text-slate-900 leading-tight mb-5">
+          Manage Your<br/><span class="text-brand-700">Orders Easily</span>
+        </h1>
+        <p class="text-slate-500 text-lg leading-relaxed mb-8 max-w-md">Track deliveries, request returns, replace products, and manage all your purchases from one secure place.</p>
+        <div class="space-y-3.5">
+          <div class="flex items-center gap-3 text-slate-600 text-sm font-500">
+            <div class="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            Secure Email OTP verification
+          </div>
+          <div class="flex items-center gap-3 text-slate-600 text-sm font-500">
+            <div class="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            Fast returns within policy window
+          </div>
+          <div class="flex items-center gap-3 text-slate-600 text-sm font-500">
+            <div class="w-6 h-6 bg-green-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+            </div>
+            Real-time order tracking updates
+          </div>
+        </div>
+        <div class="mt-10 flex items-center gap-6 flex-wrap">
+          <div class="flex items-center gap-2 text-xs text-slate-400 font-500">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+            Razorpay Secured
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-400 font-500">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            256-bit SSL
+          </div>
+          <div class="flex items-center gap-2 text-xs text-slate-400 font-500">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+            Email Verified
+          </div>
+        </div>
+      </div>
+
+      <!-- Right: Login Card -->
+      <div class="order-1 lg:order-2 anim-scale">
+        <div class="bg-white rounded-2xl shadow-card border border-slate-100 p-8 max-w-md mx-auto" style="box-shadow:var(--shadow-card)">
+
+          <!-- Login Form -->
+          <div id="login-form-wrap">
+            <div class="mb-7">
+              <h2 class="font-display text-xl font-700 text-slate-900 mb-1.5">Find Your Order</h2>
+              <p class="text-sm text-slate-500">Enter your order details to get started</p>
+            </div>
+            <div class="space-y-4">
+              <div>
+                <label class="bc-label" for="inp-order-id">Order ID</label>
+                <input id="inp-order-id" type="text" class="bc-input" placeholder="e.g. 1001 or BC-1001" autocomplete="off" />
+                <div id="err-order-id" class="field-error hidden"></div>
+              </div>
+              <div>
+                <label class="bc-label" for="inp-email">Email Address</label>
+                <input id="inp-email" type="email" class="bc-input" placeholder="your@email.com" autocomplete="email" />
+                <div id="err-email" class="field-error hidden"></div>
+              </div>
+              <div id="login-err" class="text-sm text-red-600 font-500 hidden rounded-lg bg-red-50 px-3.5 py-2.5 border border-red-100"></div>
+              <button id="btn-send-otp" class="btn-primary w-full mt-2" onclick="handleSendOTP()">
+                <span id="btn-send-otp-text">Continue</span>
+                <div id="btn-send-otp-spinner" class="spinner hidden"></div>
+              </button>
+              <p class="text-center text-xs text-slate-400 mt-3">By continuing you agree to our <a href="https://breakfastclub.co.in/policies/terms-of-service" class="text-brand-600 hover:underline">terms & conditions</a></p>
+            </div>
+          </div>
+
+          <!-- OTP Form -->
+          <div id="otp-form-wrap" class="hidden">
+            <button class="flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-800 transition-colors mb-6" onclick="goBackToLogin()">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="m12 19-7-7 7-7"/><path d="M19 12H5"/></svg>Back
+            </button>
+            <div class="mb-7">
+              <h2 class="font-display text-xl font-700 text-slate-900 mb-1.5">Verify Your Email</h2>
+              <p class="text-sm text-slate-500">We sent a 6-digit code to your email</p>
+              <p id="otp-email-display" class="text-sm font-600 text-slate-700 mt-1"></p>
+            </div>
+            <div class="flex gap-2 justify-center mb-6" id="otp-inputs-row">
+              <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="0"/>
+              <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="1"/>
+              <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="2"/>
+              <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="3"/>
+              <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="4"/>
+              <input class="otp-box" type="text" inputmode="numeric" maxlength="1" data-idx="5"/>
+            </div>
+            <div id="otp-err" class="text-sm text-red-600 font-500 hidden rounded-lg bg-red-50 px-3.5 py-2.5 border border-red-100 mb-4"></div>
+            <button id="btn-verify-otp" class="btn-primary w-full" onclick="handleVerifyOTP()">
+              <span id="btn-verify-text">Verify OTP</span>
+              <div id="btn-verify-spinner" class="spinner hidden"></div>
+            </button>
+            <div class="text-center mt-5">
+              <button id="btn-resend" class="text-sm text-brand-600 font-600 hover:underline disabled:text-slate-400 disabled:no-underline" onclick="handleResendOTP()" disabled>
+                Resend Code <span id="resend-timer"></span>
+              </button>
+            </div>
+          </div>
+
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- ═══ STATE: DASHBOARD ═══════════════════════════════════════════════════ -->
+<div id="state-dashboard" class="hidden min-h-screen bg-slate-50">
+  <header class="sticky-header">
+    <div class="max-w-5xl mx-auto px-4 sm:px-6 h-16 flex items-center gap-4">
+      <a href="https://breakfastclub.co.in" class="flex items-center gap-2 flex-shrink-0">
+        <div class="w-8 h-8 bg-brand-700 rounded-lg flex items-center justify-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11l19-9-9 19-2-8-8-2z"/></svg>
+        </div>
+        <span class="font-display font-700 text-base text-slate-900 hidden sm:block">Breakfastclub</span>
+      </a>
+      <span class="text-slate-300 font-300 hidden sm:block">|</span>
+      <span class="text-sm font-600 text-slate-600 hidden sm:block">My Orders</span>
+      <div class="flex-1"></div>
+      <div class="search-wrap flex-1 max-w-xs hidden md:block">
+        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input type="text" id="search-input" class="search-input" placeholder="Search orders or products…" oninput="handleSearch(this.value)"/>
+      </div>
+      <div id="header-user" class="flex items-center gap-2.5">
+        <div class="w-8 h-8 bg-brand-100 rounded-full flex items-center justify-center">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#1d4ed8" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+        </div>
+        <span id="header-user-name" class="text-sm font-600 text-slate-700 hidden sm:block"></span>
+      </div>
+      <button class="btn-ghost text-xs" onclick="handleLogout()">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
+        <span class="hidden sm:inline">Logout</span>
+      </button>
+    </div>
+  </header>
+
+  <main class="max-w-5xl mx-auto px-4 sm:px-6 py-8">
+
+    <!-- Active Order Banner -->
+    <div id="active-banner" class="hidden mb-8 active-banner rounded-2xl p-6 sm:p-8 text-white anim-up">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <div>
+          <div class="flex items-center gap-2 mb-2">
+            <div class="w-6 h-6 bg-white/20 rounded-full flex items-center justify-center">
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14"/><path d="m12 5 7 7-7 7"/></svg>
+            </div>
+            <span class="text-sm font-600 text-white/80">Your Latest Active Order</span>
+          </div>
+          <h3 class="font-display text-2xl sm:text-3xl font-700 text-white mb-1" id="banner-title">On Its Way</h3>
+          <p class="text-white/70 text-sm" id="banner-subtitle"></p>
+        </div>
+        <button id="banner-track-btn" class="flex-shrink-0 inline-flex items-center gap-2 bg-white text-brand-700 font-600 text-sm px-5 py-2.5 rounded-xl hover:bg-blue-50 transition-colors shadow-sm" onclick="openTrackFromBanner()">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+          Track Package
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Search -->
+    <div class="search-wrap mb-4 md:hidden">
+      <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+      <input type="text" class="search-input w-full max-w-full" placeholder="Search orders or products…" oninput="handleSearch(this.value)"/>
+    </div>
+
+    <!-- Tabs + Sort -->
+    <div class="flex items-center justify-between gap-4 flex-wrap mb-6">
+      <div class="flex items-center gap-1 bg-slate-100 rounded-xl p-1 overflow-x-auto no-scrollbar">
+        <button class="tab-btn active" data-tab="all"       onclick="switchTab('all')">All Orders</button>
+        <button class="tab-btn"        data-tab="active"    onclick="switchTab('active')">Active</button>
+        <button class="tab-btn"        data-tab="delivered" onclick="switchTab('delivered')">Delivered</button>
+        <button class="tab-btn"        data-tab="cancelled" onclick="switchTab('cancelled')">Cancelled</button>
+        <button class="tab-btn"        data-tab="returns"   onclick="switchTab('returns')">Returns</button>
+      </div>
+      <select class="bc-input h-9 text-sm py-0 w-auto flex-shrink-0" style="height:38px;padding:0 36px 0 12px;width:160px" onchange="handleSort(this.value)">
+        <option value="newest">Newest First</option>
+        <option value="oldest">Oldest First</option>
+      </select>
+    </div>
+
+    <div id="orders-container" class="space-y-4"></div>
+    <div id="returns-container" class="hidden space-y-4"></div>
+
+    <!-- Empty State -->
+    <div id="empty-state" class="hidden text-center py-20">
+      <div class="w-20 h-20 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-5">
+        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+      </div>
+      <h3 class="font-display text-xl font-600 text-slate-700 mb-2" id="empty-title">No orders found</h3>
+      <p class="text-slate-400 text-sm max-w-xs mx-auto" id="empty-subtitle">You haven't placed any orders yet.</p>
+      <a href="https://breakfastclub.co.in" class="btn-primary inline-flex mt-6" style="height:44px">Browse Products</a>
+    </div>
+  </main>
+</div>
+
+<!-- ═══ MODALS ═════════════════════════════════════════════════════════════ -->
+<div id="modal-overlay" class="modal-backdrop hidden" onclick="handleModalBackdropClick(event)">
+  <div id="modal-track"   class="modal-panel hidden"><div class="p-6 sm:p-8"><div class="flex items-center justify-between mb-6"><h3 class="font-display text-xl font-700 text-slate-900">Track Package</h3><button class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center" onclick="closeModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div id="track-modal-content"></div></div></div>
+  <div id="modal-return"  class="modal-panel hidden"><div class="p-6 sm:p-8"><div class="flex items-center justify-between mb-6"><h3 class="font-display text-xl font-700 text-slate-900">Return Item</h3><button class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center" onclick="closeModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div id="return-modal-content"></div></div></div>
+  <div id="modal-replace" class="modal-panel hidden"><div class="p-6 sm:p-8"><div class="flex items-center justify-between mb-6"><h3 class="font-display text-xl font-700 text-slate-900">Replace Item</h3><button class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center" onclick="closeModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button></div><div id="replace-modal-content"></div></div></div>
+  <div id="modal-cancel"  class="modal-panel hidden"><div class="p-6 sm:p-8"><div id="cancel-modal-content"></div></div></div>
+</div>
+
+<div id="toast-container"></div>
+
+<!-- ═══ SCRIPT ════════════════════════════════════════════════════════════ -->
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────
+let CONFIG = {
+  SUPABASE_URL:       window.__BC_SUPABASE_URL__       || '',
+  SUPABASE_ANON_KEY:  window.__BC_SUPABASE_ANON_KEY__  || '',
+  RAZORPAY_KEY_ID:    window.__BC_RAZORPAY_KEY_ID__    || '',
+  RECAPTCHA_SITE_KEY: window.__BC_RECAPTCHA_SITE_KEY__ || '',
+  API_BASE:           window.__BC_API_BASE__            || window.location.origin,
+};
+
+let supabase = null;
+
+async function loadConfigFromServer() {
+  try {
+    const r = await fetch('/api/config');
+    if (r.ok) { CONFIG = { ...CONFIG, ...await r.json() }; }
+  } catch {}
+}
+
+function initServices() {
+  try {
+    if (CONFIG.SUPABASE_URL && CONFIG.SUPABASE_ANON_KEY) {
+      supabase = window.supabase.createClient(CONFIG.SUPABASE_URL, CONFIG.SUPABASE_ANON_KEY);
+    }
+  } catch(e) { console.warn('Supabase init failed:', e); }
+  if (CONFIG.RECAPTCHA_SITE_KEY) {
+    const s = document.createElement('script');
+    s.src = `https://www.google.com/recaptcha/api.js?render=${CONFIG.RECAPTCHA_SITE_KEY}`;
+    s.async = true;
+    document.head.appendChild(s);
+  }
+}
+
+// ─── APP STATE ────────────────────────────────────────────────────────────
+const App = {
+  session:              JSON.parse(sessionStorage.getItem('bc_session') || 'null'),
+  orders:               [],
+  returnRequests:       [],
+  replacementRequests:  [],
+  allProducts:          [],
+  activeTab:            'all',
+  searchQuery:          '',
+  sortOrder:            'newest',
+  modal:                null,
+  activeBannerOrder:    null,
+  otpTimerInterval:     null,
+  otpTimerSeconds:      0,
+  uploadedFiles:        { return: [], replace: [] },
+  _pendingEmail:        '',
+  _pendingOrderId:      '',
+  _returnOrder:         null,
+  _returnItem:          null,
+  _replaceOrder:        null,
+  _replaceItem:         null,
+  _cancelOrder:         null,
+  _priceDiff:           0,
+  _razorpayPaymentId:   null,
+};
+
+// ─── RECAPTCHA ────────────────────────────────────────────────────────────
+async function getRecaptchaToken(action) {
+  if (typeof grecaptcha === 'undefined' || !CONFIG.RECAPTCHA_SITE_KEY) return null;
+  return new Promise(resolve => {
+    grecaptcha.ready(() => {
+      grecaptcha.execute(CONFIG.RECAPTCHA_SITE_KEY, { action }).then(resolve).catch(() => resolve(null));
+    });
+  });
+}
+
+// ─── UTILITIES ────────────────────────────────────────────────────────────
+const fmt = {
+  price:   n  => '₹' + parseFloat(n||0).toLocaleString('en-IN',{minimumFractionDigits:0,maximumFractionDigits:0}),
+  date:    d  => { if(!d) return '—'; try{return new Date(d).toLocaleDateString('en-IN',{day:'numeric',month:'short',year:'numeric'});}catch{return d;} },
+  orderId: id => { if(!id) return ''; const s=String(id); return s.startsWith('#')?s:'#'+s; },
+};
+
+function daysSince(dateStr) {
+  if (!dateStr) return null;
+  try { return Math.floor((Date.now()-new Date(dateStr))/86400000); } catch { return null; }
+}
+
+function isActiveStatus(s) { return ['placed','processing','shipped','out_for_delivery'].includes((s||'').toLowerCase()); }
+function isDelivered(s)     { return (s||'').toLowerCase() === 'delivered'; }
+function isCancelled(s)     { return (s||'').toLowerCase() === 'cancelled'; }
+
+function getDisplayStatus(order) {
+  if (order.status && order.status !== '') return order.status;
+  if (order.fulfillment_status === 'fulfilled') return 'delivered';
+  if (order.fulfillment_status === 'partial')   return 'shipped';
+  return order.financial_status || 'placed';
+}
+
+function getOrderActions(order) {
+  const s       = (order.status || order.fulfillment_status || '').toLowerCase();
+  const fin     = (order.financial_status || '').toLowerCase();
+  const delivered = isDelivered(s) || (s===''&&fin==='paid'&&order.fulfillment_status==='fulfilled');
+  const ds      = delivered ? daysSince(order.updated_at||order.created_at) : null;
+  const hasTracking = !!(order.tracking_number||order.tracking_url);
+  return {
+    showTrack:    hasTracking && !isCancelled(s),
+    showReturn:   delivered && ds!==null && ds<=3,
+    showReplace:  delivered && ds!==null && ds<=3,
+    showCancel:   ['placed','processing'].includes(s),
+    showBuyAgain: true,
+    showInvoice:  ['shipped','out_for_delivery','delivered'].includes(s)||s==='',
+  };
+}
+
+function getBadgeClass(status) {
+  const s=(status||'placed').toLowerCase();
+  const map={delivered:'badge-delivered',shipped:'badge-shipped',processing:'badge-processing',placed:'badge-placed',cancelled:'badge-cancelled',returned:'badge-returned',out_for_delivery:'badge-out_for_delivery'};
+  return map[s]||'badge-placed';
+}
+function getBadgeLabel(status) {
+  const map={placed:'Placed',processing:'Processing',shipped:'Shipped',out_for_delivery:'Out for Delivery',delivered:'Delivered',cancelled:'Cancelled',returned:'Returned',pending_review:'Pending Review',approved:'Approved',rejected:'Rejected',pickup_scheduled:'Pickup Scheduled',completed:'Completed'};
+  return map[(status||'').toLowerCase()]||(status||'Unknown');
+}
+
+// ─── API HELPERS ──────────────────────────────────────────────────────────
+async function apiPost(endpoint, body) {
+  const r = await fetch(CONFIG.API_BASE + endpoint, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+  if (!r.ok) { const e=await r.json().catch(()=>({})); throw new Error(e.error||e.message||'Request failed'); }
+  return r.json();
+}
+
+async function sendOTP(email, orderId, recaptchaToken) {
+  return apiPost('/api/send-otp', { email, orderId, recaptchaToken });
+}
+async function verifyOTP(email, orderId, otp) {
+  return apiPost('/api/verify-otp', { email, orderId, otp });
+}
+
+async function fetchOrdersDirect(email) {
+  if (!supabase) throw new Error('Supabase not initialised');
+  const { data, error } = await supabase
+    .from('orders_cache')
+    .select('*')
+    .eq('email', email)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return data || [];
+}
+
+async function fetchReturnRequests(customerId) {
+  if (!supabase||!customerId) return [];
+  const { data } = await supabase.from('aftersale_return_request').select('*').eq('customer_id', customerId).order('created_at',{ascending:false});
+  return data||[];
+}
+async function fetchReplacementRequests(customerId) {
+  if (!supabase||!customerId) return [];
+  const { data } = await supabase.from('aftersale_replacement_request').select('*').eq('customer_id', customerId).order('created_at',{ascending:false});
+  return data||[];
+}
+async function fetchAllProducts() {
+  if (!supabase) return [];
+  const { data } = await supabase.from('products').select('*').order('name');
+  return data||[];
+}
+
+async function uploadImages(files, bucket='return-images') {
+  if (!supabase||!files.length) return [];
+  const urls=[];
+  for (const f of files) {
+    const name=`${Date.now()}-${Math.random().toString(36).slice(2)}-${f.name}`;
+    const { error } = await supabase.storage.from(bucket).upload(name,f,{cacheControl:'3600',upsert:false});
+    if (!error) {
+      const { data:ud } = supabase.storage.from(bucket).getPublicUrl(name);
+      if (ud?.publicUrl) urls.push(ud.publicUrl);
+    }
+  }
+  return urls;
+}
+
+async function submitReturnRequest(payload) {
+  if (!supabase) throw new Error('Supabase not initialised');
+  const { data,error } = await supabase.from('aftersale_return_request').insert(payload).select().single();
+  if (error) throw error;
+  return data;
+}
+async function submitReplacementRequest(payload) {
+  if (!supabase) throw new Error('Supabase not initialised');
+  const { data,error } = await supabase.from('aftersale_replacement_request').insert(payload).select().single();
+  if (error) throw error;
+  return data;
+}
+
+async function createRazorpayOrder(amountInRupees) {
+  // API expects rupees and converts to paise internally
+  return apiPost('/api/razorpay-create-order', { amount: amountInRupees, currency: 'INR' });
+}
+
+// ─── TOAST ────────────────────────────────────────────────────────────────
+function showToast(msg, type='default', duration=3500) {
+  const container=document.getElementById('toast-container');
+  const el=document.createElement('div');
+  const icons={
+    success:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#86efac" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>',
+    error:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#fca5a5" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    default:'<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>',
+  };
+  el.className=`toast ${type}`;
+  el.innerHTML=(icons[type]||icons.default)+`<span>${msg}</span>`;
+  container.appendChild(el);
+  setTimeout(()=>{el.style.opacity='0';el.style.transform='translateY(8px)';el.style.transition='all .2s';setTimeout(()=>el.remove(),200);},duration);
+}
+
+// ─── STATE ────────────────────────────────────────────────────────────────
+function showState(state) {
+  ['login','dashboard'].forEach(s=>document.getElementById(`state-${s}`).classList.add('hidden'));
+  document.getElementById(`state-${state}`).classList.remove('hidden');
+}
+
+// ─── LOGIN FLOW ───────────────────────────────────────────────────────────
+function validateLoginForm() {
+  const orderId = document.getElementById('inp-order-id').value.trim();
+  const email   = document.getElementById('inp-email').value.trim();
+  let ok = true;
+  const setErr = (id, msg) => { const el=document.getElementById(id); el.textContent=msg; el.classList.toggle('hidden',!msg); };
+  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+  setErr('err-order-id', !orderId ? 'Please enter your order ID' : '');
+  setErr('err-email', !email ? 'Please enter your email' : !emailRegex.test(email) ? 'Enter a valid email address' : '');
+  if (!orderId) ok = false;
+  if (!email || !emailRegex.test(email)) ok = false;
+  return ok;
+}
+
+async function handleSendOTP() {
+  if (!validateLoginForm()) return;
+  const orderId = document.getElementById('inp-order-id').value.trim();
+  const email   = document.getElementById('inp-email').value.trim();
+  const errEl   = document.getElementById('login-err');
+  const btn     = document.getElementById('btn-send-otp');
+  const btnText = document.getElementById('btn-send-otp-text');
+  const spinner = document.getElementById('btn-send-otp-spinner');
+  btn.disabled=true; btnText.textContent='Sending…'; spinner.classList.remove('hidden');
+  errEl.classList.add('hidden');
+  try {
+    const recaptchaToken = await getRecaptchaToken('send_otp');
+    await sendOTP(email, orderId, recaptchaToken);
+    App._pendingEmail   = email;
+    App._pendingOrderId = orderId;
+    document.getElementById('login-form-wrap').classList.add('hidden');
+    document.getElementById('otp-form-wrap').classList.remove('hidden');
+    document.getElementById('otp-email-display').textContent = email;
+    startOTPTimer(60);
+    document.querySelector('.otp-box[data-idx="0"]').focus();
+  } catch(err) {
+    errEl.textContent = err.message || 'Failed to send OTP. Please try again.';
+    errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled=false; btnText.textContent='Continue'; spinner.classList.add('hidden');
+  }
+}
+
+function goBackToLogin() {
+  document.getElementById('otp-form-wrap').classList.add('hidden');
+  document.getElementById('login-form-wrap').classList.remove('hidden');
+  clearOTPInputs(); clearOTPTimer();
+}
+
+function startOTPTimer(seconds) {
+  App.otpTimerSeconds=seconds;
+  const btn=document.getElementById('btn-resend');
+  const timerEl=document.getElementById('resend-timer');
+  btn.disabled=true; clearOTPTimer();
+  App.otpTimerInterval=setInterval(()=>{
+    App.otpTimerSeconds--;
+    timerEl.textContent=App.otpTimerSeconds>0?`(${App.otpTimerSeconds}s)`:'';
+    if(App.otpTimerSeconds<=0){clearOTPTimer();btn.disabled=false;timerEl.textContent='';}
+  },1000);
+  timerEl.textContent=`(${seconds}s)`;
+}
+function clearOTPTimer() { if(App.otpTimerInterval){clearInterval(App.otpTimerInterval);App.otpTimerInterval=null;} }
+function clearOTPInputs() { document.querySelectorAll('.otp-box').forEach(b=>{b.value='';b.classList.remove('error');}); }
+function getOTPValue()    { return Array.from(document.querySelectorAll('.otp-box')).map(b=>b.value).join(''); }
+
+async function handleVerifyOTP() {
+  const otp=getOTPValue();
+  const errEl=document.getElementById('otp-err');
+  errEl.classList.add('hidden');
+  if(otp.length<6){errEl.textContent='Please enter all 6 digits';errEl.classList.remove('hidden');document.querySelectorAll('.otp-box').forEach(b=>b.classList.add('error'));return;}
+  const btn=document.getElementById('btn-verify-otp');
+  const btnText=document.getElementById('btn-verify-text');
+  const spinner=document.getElementById('btn-verify-spinner');
+  btn.disabled=true; btnText.textContent='Verifying…'; spinner.classList.remove('hidden');
+  try {
+    const result = await verifyOTP(App._pendingEmail, App._pendingOrderId, otp);
+    App.session = {
+      email:        App._pendingEmail,
+      orderId:      App._pendingOrderId,
+      customerId:   result.customerId   || null,
+      customerName: result.customerName || result.name || 'Customer',
+      sessionToken: result.sessionToken || null,
+    };
+    sessionStorage.setItem('bc_session', JSON.stringify(App.session));
+    clearOTPTimer();
+    await loadDashboard();
+  } catch(err) {
+    errEl.textContent=err.message||'Incorrect OTP. Please try again.';
+    errEl.classList.remove('hidden');
+    document.querySelectorAll('.otp-box').forEach(b=>b.classList.add('error'));
+  } finally {
+    btn.disabled=false; btnText.textContent='Verify OTP'; spinner.classList.add('hidden');
+  }
+}
+
+async function handleResendOTP() {
+  const errEl=document.getElementById('otp-err');
+  errEl.classList.add('hidden'); clearOTPInputs();
+  try {
+    const recaptchaToken=await getRecaptchaToken('resend_otp');
+    await sendOTP(App._pendingEmail, App._pendingOrderId, recaptchaToken);
+    startOTPTimer(60);
+    showToast('OTP resent to your email','success');
+  } catch(err) {
+    errEl.textContent=err.message||'Failed to resend OTP.'; errEl.classList.remove('hidden');
+  }
+}
+
+// OTP keyboard navigation
+document.addEventListener('DOMContentLoaded',()=>{
+  const boxes=document.querySelectorAll('.otp-box');
+  boxes.forEach((box,i)=>{
+    box.addEventListener('input',e=>{
+      const val=e.target.value.replace(/\D/g,'');
+      e.target.value=val.slice(-1);
+      e.target.classList.remove('error');
+      if(val&&i<5) boxes[i+1].focus();
+    });
+    box.addEventListener('keydown',e=>{
+      if(e.key==='Backspace'&&!box.value&&i>0) boxes[i-1].focus();
+      if(e.key==='ArrowLeft'&&i>0) boxes[i-1].focus();
+      if(e.key==='ArrowRight'&&i<5) boxes[i+1].focus();
+    });
+    box.addEventListener('paste',e=>{
+      e.preventDefault();
+      const text=(e.clipboardData||window.clipboardData).getData('text').replace(/\D/g,'');
+      if(text.length>=6){boxes.forEach((b,j)=>{b.value=text[j]||'';b.classList.remove('error');});boxes[5].focus();}
+    });
+  });
+});
+
+// ─── DASHBOARD ────────────────────────────────────────────────────────────
+async function loadDashboard() {
+  showState('dashboard');
+  document.getElementById('header-user-name').textContent = App.session.customerName||'Customer';
+  renderSkeletons();
+  try {
+    // Try backend first, fall back to direct Supabase
+    let orders=[];
+    try {
+      const r=await fetch(`${CONFIG.API_BASE}/api/orders`,{headers:{'x-session-token':App.session.sessionToken||'','x-email':App.session.email}});
+      if(r.ok) orders=await r.json();
+    } catch {}
+    if(!orders.length && supabase) orders=await fetchOrdersDirect(App.session.email);
+    App.orders=orders;
+
+    if(App.session.customerId) {
+      const [ret,rep]=await Promise.all([fetchReturnRequests(App.session.customerId),fetchReplacementRequests(App.session.customerId)]);
+      App.returnRequests=ret; App.replacementRequests=rep;
+    }
+    App.allProducts=await fetchAllProducts();
+
+    App.activeBannerOrder=App.orders.find(o=>isActiveStatus(getDisplayStatus(o)));
+    if(App.activeBannerOrder) renderActiveBanner(App.activeBannerOrder);
+
+    renderOrders();
+  } catch(err) {
+    console.error('Dashboard error:',err);
+    renderOrdersEmpty('Unable to load orders','There was a problem fetching your orders. Please try again.',true);
+  }
+}
+
+function renderSkeletons() {
+  const c=document.getElementById('orders-container');
+  c.innerHTML=[1,2,3].map(()=>`
+    <div class="order-card p-6">
+      <div class="flex items-center justify-between mb-4"><div class="flex gap-3"><div class="skeleton h-4 w-28 rounded"></div><div class="skeleton h-4 w-20 rounded"></div></div><div class="skeleton h-6 w-20 rounded-full"></div></div>
+      <div class="border-t border-slate-100 pt-4 flex gap-4"><div class="skeleton w-16 h-16 rounded-xl flex-shrink-0"></div><div class="flex-1 space-y-2.5"><div class="skeleton h-4 w-3/4 rounded"></div><div class="skeleton h-3 w-1/3 rounded"></div></div></div>
+    </div>`).join('');
+}
+
+function renderActiveBanner(order) {
+  const s=getDisplayStatus(order);
+  const labels={placed:'Order Confirmed',processing:'Being Prepared',shipped:'On Its Way',out_for_delivery:'Out for Delivery Today'};
+  document.getElementById('banner-title').textContent=labels[s.toLowerCase()]||'Active Order';
+  document.getElementById('banner-subtitle').textContent=order.expected_delivery?`Expected by ${fmt.date(order.expected_delivery)}`:`Order ${fmt.orderId(order.order_name||order.shopify_order_id)}`;
+  document.getElementById('active-banner').classList.remove('hidden');
+}
+
+function openTrackFromBanner() { if(App.activeBannerOrder) openTrackModal(App.activeBannerOrder); }
+
+// ─── ORDER RENDERING ──────────────────────────────────────────────────────
+function getFilteredOrders() {
+  let orders=[...App.orders];
+  const tab=App.activeTab; const q=App.searchQuery.toLowerCase();
+  if(tab==='active')    orders=orders.filter(o=>isActiveStatus(getDisplayStatus(o)));
+  if(tab==='delivered') orders=orders.filter(o=>isDelivered(getDisplayStatus(o)));
+  if(tab==='cancelled') orders=orders.filter(o=>isCancelled(getDisplayStatus(o)));
+  if(q) orders=orders.filter(o=>{
+    const name=String(o.order_name||o.shopify_order_id||'').toLowerCase();
+    const items=JSON.stringify(o.items||[]).toLowerCase();
+    const custName=(o.customer_name||'').toLowerCase();
+    return name.includes(q)||items.includes(q)||custName.includes(q);
+  });
+  if(App.sortOrder==='oldest') orders.sort((a,b)=>new Date(a.created_at)-new Date(b.created_at));
+  else orders.sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  return orders;
+}
+
+function renderOrders() {
+  const container=document.getElementById('orders-container');
+  const returnsContainer=document.getElementById('returns-container');
+  const emptyState=document.getElementById('empty-state');
+  returnsContainer.classList.add('hidden'); container.classList.remove('hidden');
+  if(App.activeTab==='returns'){
+    container.classList.add('hidden'); returnsContainer.classList.remove('hidden');
+    renderReturnsTab(); emptyState.classList.add('hidden'); return;
+  }
+  const orders=getFilteredOrders();
+  emptyState.classList.add('hidden');
+  if(!orders.length){
+    container.innerHTML='';
+    renderOrdersEmpty(App.searchQuery?'No results found':'No orders here',App.searchQuery?'Try a different search term.':'Orders in this category will appear here.',false);
+    return;
+  }
+  container.innerHTML=orders.map(o=>renderOrderCard(o)).join('');
+  container.querySelectorAll('.order-card').forEach((card,i)=>{card.style.animationDelay=`${i*40}ms`;card.classList.add('anim-up');});
+}
+
+function renderOrdersEmpty(title,subtitle,showRetry) {
+  const emptyState=document.getElementById('empty-state');
+  document.getElementById('empty-title').textContent=title;
+  document.getElementById('empty-subtitle').textContent=subtitle;
+  emptyState.classList.remove('hidden');
+  if(showRetry){const btn=emptyState.querySelector('a');if(btn){btn.textContent='Retry';btn.href='#';btn.onclick=e=>{e.preventDefault();loadDashboard();};}}
+}
+
+function renderOrderCard(order) {
+  const status=getDisplayStatus(order);
+  const actions=getOrderActions(order);
+  const items=(()=>{try{return Array.isArray(order.items)?order.items:JSON.parse(order.items||'[]');}catch{return [];}})();
+  const firstItem=items[0]||{};
+  const extraCount=items.length-1;
+  const oe=JSON.stringify(order).replace(/"/g,'&quot;');
+  const ie=JSON.stringify(firstItem).replace(/"/g,'&quot;');
+  const imgSrc=firstItem.image||firstItem.image_url||'';
+  const imgHtml=imgSrc?`<img src="${imgSrc}" alt="${firstItem.title||''}" class="product-img" loading="lazy" onerror="this.src='data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 width=%2272%22 height=%2272%22 viewBox=%220 0 72 72%22%3E%3Crect width=%2272%22 height=%2272%22 fill=%22%23f1f5f9%22 rx=%2210%22/%3E%3C/svg%3E'"/>`:`<div class="product-img flex items-center justify-center"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#cbd5e1" stroke-width="1.5"><path d="M20 7H4a2 2 0 0 0-2 2v10a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2z"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/></svg></div>`;
+
+  const actionBtns=(inline=false)=>`
+    ${actions.showTrack    ?`<button class="btn-action btn-track"   onclick="openTrackModal(${oe})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>Track</button>`:''}
+    ${actions.showInvoice  ?`<button class="btn-action btn-invoice" onclick="openInvoice('${order.shopify_order_id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>Invoice</button>`:''}
+    ${actions.showBuyAgain ?`<button class="btn-action btn-buy"     onclick="buyAgain('${order.shopify_order_id}')"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>Buy Again</button>`:''}
+    ${actions.showReturn&&items.length ?`<button class="btn-action btn-return"  onclick="openReturnModal(${oe},${ie})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg>Return</button>`:''}
+    ${actions.showReplace&&items.length?`<button class="btn-action btn-replace" onclick="openReplaceModal(${oe},${ie})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><polyline points="16 3 21 8 16 13"/><path d="M4 20v-7a4 4 0 0 1 4-4h13"/></svg>Replace</button>`:''}
+    ${actions.showCancel   ?`<button class="btn-action btn-cancel"  onclick="openCancelModal(${oe})"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>Cancel</button>`:''}`;
+
+  return `
+    <div class="order-card">
+      <div class="px-5 pt-5 pb-4 flex flex-wrap items-start justify-between gap-3">
+        <div class="flex flex-wrap items-center gap-3">
+          <span class="text-xs font-500 text-slate-500">Ordered ${fmt.date(order.created_at)}</span>
+          <span class="text-xs text-slate-300">•</span>
+          <span class="text-sm font-600 text-slate-800">${fmt.price(order.total_amount||order.total_price||0)}</span>
+          ${order.customer_name?`<span class="text-xs text-slate-300">•</span><span class="text-xs font-500 text-slate-500">Ship to ${order.customer_name.split(' ')[0]}</span>`:''}
+          <span class="text-xs text-slate-300">•</span>
+          <span class="text-xs font-600 text-slate-600">${fmt.orderId(order.order_name||order.shopify_order_id)}</span>
+        </div>
+        <span class="badge ${getBadgeClass(status)}">${getBadgeLabel(status)}</span>
+      </div>
+      <div class="border-t border-slate-100 mx-5"></div>
+      <div class="p-5 flex gap-4">
+        <div class="flex gap-4 flex-1 min-w-0">
+          ${imgHtml}
+          <div class="flex-1 min-w-0">
+            <div class="font-600 text-slate-900 text-sm leading-snug mb-1 truncate">${firstItem.title||firstItem.name||'Product'}</div>
+            ${firstItem.variant_title||firstItem.variant?`<div class="text-xs text-slate-500 mb-1">${firstItem.variant_title||firstItem.variant}</div>`:''}
+            <div class="text-xs text-slate-500">Qty: ${firstItem.quantity||1}</div>
+            <div class="text-sm font-600 text-slate-700 mt-1">${fmt.price(firstItem.price||0)}</div>
+            ${extraCount>0?`<div class="text-xs text-slate-400 mt-1">+ ${extraCount} more item${extraCount>1?'s':''}</div>`:''}
+          </div>
+        </div>
+        <div class="hidden sm:flex flex-col gap-2 flex-shrink-0">${actionBtns()}</div>
+      </div>
+      <div class="sm:hidden px-5 pb-5"><div class="flex flex-wrap gap-2">${actionBtns()}</div></div>
+    </div>`;
+}
+
+function renderReturnsTab() {
+  const c=document.getElementById('returns-container');
+  const all=[...App.returnRequests.map(r=>({...r,reqType:'Return'}),...App.replacementRequests.map(r=>({...r,reqType:'Replace'})))].sort((a,b)=>new Date(b.created_at)-new Date(a.created_at));
+  if(!all.length){c.innerHTML=`<div class="text-center py-16"><div class="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-4"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" stroke-width="1.5"><polyline points="9 14 4 9 9 4"/><path d="M20 20v-7a4 4 0 0 0-4-4H4"/></svg></div><h3 class="font-display text-lg font-600 text-slate-700 mb-1">No requests yet</h3><p class="text-slate-400 text-sm">Your return and replacement requests will appear here.</p></div>`;return;}
+  c.innerHTML=all.map(req=>`<div class="order-card p-5"><div class="flex items-start justify-between gap-3 flex-wrap"><div class="flex-1"><div class="flex items-center gap-2.5 mb-2 flex-wrap"><span class="inline-flex items-center gap-1.5 text-xs font-700 px-2.5 py-1 rounded-full ${req.reqType==='Return'?'bg-orange-50 text-orange-700':'bg-green-50 text-green-700'}">${req.reqType==='Return'?'↩':'⟳'} ${req.reqType} Request</span><span class="text-xs text-slate-400">${fmt.date(req.created_at)}</span></div><div class="text-sm font-500 text-slate-600">Request #${req.id}</div>${req.reason?`<div class="text-xs text-slate-400 mt-1">Reason: ${req.reason}</div>`:''}</div><span class="badge ${getBadgeClass(req.status)}">${getBadgeLabel(req.status)}</span></div></div>`).join('');
+}
+
+function switchTab(tab) { App.activeTab=tab; document.querySelectorAll('.tab-btn').forEach(b=>b.classList.toggle('active',b.dataset.tab===tab)); renderOrders(); }
+function handleSearch(q) { App.searchQuery=q; renderOrders(); }
+function handleSort(v)   { App.sortOrder=v;  renderOrders(); }
+
+// ─── MODALS ───────────────────────────────────────────────────────────────
+function showModal(type) {
+  const overlay=document.getElementById('modal-overlay');
+  ['track','return','replace','cancel'].forEach(t=>document.getElementById(`modal-${t}`).classList.toggle('hidden',t!==type));
+  overlay.classList.remove('hidden'); App.modal=type; document.body.style.overflow='hidden';
+}
+function closeModal() {
+  document.getElementById('modal-overlay').classList.add('hidden');
+  App.modal=null; App.uploadedFiles={return:[],replace:[]}; document.body.style.overflow='';
+}
+function handleModalBackdropClick(e) { if(e.target===document.getElementById('modal-overlay')) closeModal(); }
+document.addEventListener('keydown',e=>{ if(e.key==='Escape'&&App.modal) closeModal(); });
+
+// ─── TRACK MODAL ─────────────────────────────────────────────────────────
+function openTrackModal(order) {
+  if(typeof order==='string') order=JSON.parse(order);
+  const trackingNumber=order.tracking_number||'—';
+  const trackingUrl=order.tracking_url||null;
+  const carrier=order.carrier||'Carrier';
+  const status=getDisplayStatus(order);
+  const steps=[
+    {key:'placed',label:'Order Placed',sub:fmt.date(order.created_at)},
+    {key:'processing',label:'Being Packed',sub:'Preparing your order'},
+    {key:'shipped',label:'Shipped',sub:trackingNumber!=='—'?`#${trackingNumber}`:'In transit'},
+    {key:'out_for_delivery',label:'Out for Delivery',sub:'Arriving today'},
+    {key:'delivered',label:'Delivered',sub:order.expected_delivery?fmt.date(order.expected_delivery):'Delivered'},
+  ];
+  const order_idx={placed:0,processing:1,shipped:2,out_for_delivery:3,delivered:4};
+  const current=order_idx[status.toLowerCase()]??0;
+  const timelineHtml=steps.map((step,i)=>`
+    <div>
+      <div class="timeline-step">
+        <div class="timeline-dot ${i<current?'done':i===current?'active':'pending'}">
+          ${i<current?'<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>':String(i+1)}
+        </div>
+        <div class="pt-1 pb-1">
+          <div class="text-sm font-600 ${i<=current?'text-slate-900':'text-slate-400'}">${step.label}</div>
+          <div class="text-xs ${i<=current?'text-slate-500':'text-slate-300'} mt-0.5">${step.sub}</div>
+        </div>
+      </div>
+      ${i<steps.length-1?`<div class="timeline-line ${i<current?'done':''}"></div>`:''}
+    </div>`).join('');
+  document.getElementById('track-modal-content').innerHTML=`
+    <div class="bg-slate-50 rounded-xl p-4 mb-6 flex items-center justify-between flex-wrap gap-3">
+      <div><div class="text-xs text-slate-500 mb-0.5">Tracking Number</div><div class="font-700 text-slate-900 text-sm">${trackingNumber}</div></div>
+      <div><div class="text-xs text-slate-500 mb-0.5">Carrier</div><div class="font-600 text-slate-700 text-sm">${carrier}</div></div>
+      <div><div class="text-xs text-slate-500 mb-0.5">Expected By</div><div class="font-600 text-slate-700 text-sm">${order.expected_delivery?fmt.date(order.expected_delivery):'—'}</div></div>
+    </div>
+    <div class="mb-6">${timelineHtml}</div>
+    ${trackingUrl?`<a href="${trackingUrl}" target="_blank" rel="noopener" class="btn-primary w-full flex justify-center" style="text-decoration:none">Open Tracking Link <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:''}`;
+  showModal('track');
+}
+
+// ─── RETURN MODAL ─────────────────────────────────────────────────────────
+function openReturnModal(order,item) {
+  if(typeof order==='string') order=JSON.parse(order);
+  if(typeof item==='string')  item=JSON.parse(item);
+  App._returnOrder=order; App._returnItem=item; App.uploadedFiles.return=[];
+  const imgSrc=item.image||item.image_url||'';
+  document.getElementById('return-modal-content').innerHTML=`
+    <div class="flex gap-4 p-4 bg-slate-50 rounded-xl mb-6">
+      ${imgSrc?`<img src="${imgSrc}" alt="" class="w-14 h-14 rounded-lg object-cover flex-shrink-0"/>`:'<div class="w-14 h-14 rounded-lg bg-slate-200 flex-shrink-0"></div>'}
+      <div class="min-w-0"><div class="font-600 text-slate-900 text-sm truncate">${item.title||item.name||'Product'}</div>${item.variant_title||item.variant?`<div class="text-xs text-slate-500 mt-0.5">${item.variant_title||item.variant}</div>`:''}<div class="text-sm font-600 text-slate-700 mt-1">${fmt.price(item.price||0)}</div></div>
+    </div>
+    <form id="return-form" class="space-y-5" onsubmit="handleReturnSubmit(event)">
+      <div>
+        <label class="bc-label">Reason for Return *</label>
+        <select id="ret-reason" class="bc-input" required>
+          <option value="">Select a reason…</option>
+          <option>Damaged item</option><option>Wrong item received</option><option>Missing parts</option><option>Defective product</option><option>Not as described</option><option>Other</option>
+        </select>
+        <div id="err-ret-reason" class="field-error hidden"></div>
+      </div>
+      <div>
+        <label class="bc-label">Upload Product Photos</label>
+        <div id="ret-dropzone" class="dropzone" onclick="document.getElementById('ret-file-input').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleFileDrop(event,'return')">
+          <div class="flex flex-col items-center gap-2.5 text-slate-400 pointer-events-none">
+            <svg width="32" height="32" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+            <span class="text-sm font-500">Drag photos here or <span class="text-brand-600">browse</span></span>
+            <span class="text-xs">JPG, PNG, WEBP up to 5MB each</span>
+          </div>
+        </div>
+        <input type="file" id="ret-file-input" accept="image/*" multiple class="hidden" onchange="handleFileSelect(event,'return')"/>
+        <div id="ret-thumbs" class="flex gap-2 flex-wrap mt-2"></div>
+      </div>
+      <div>
+        <label class="bc-label">Additional Details</label>
+        <textarea id="ret-details" class="bc-input" rows="3" placeholder="Describe the issue in detail…"></textarea>
+      </div>
+      <div>
+        <label class="bc-label">Contact Email *</label>
+        <input id="ret-email" type="email" class="bc-input" value="${App.session?.email||''}" required/>
+        <div id="err-ret-email" class="field-error hidden"></div>
+      </div>
+      <div>
+        <label class="bc-label">Pickup Address *</label>
+        <textarea id="ret-address" class="bc-input" rows="2" placeholder="Full address for pickup…" required></textarea>
+        <div id="err-ret-address" class="field-error hidden"></div>
+      </div>
+      <div>
+        <label class="bc-label">Refund Method *</label>
+        <div class="space-y-2.5">
+          <label class="radio-card flex items-center gap-3"><input type="radio" name="ret-refund" value="upi"  class="accent-brand-700" onchange="toggleRefundFields('upi')"  required/><span class="text-sm font-500 text-slate-700">UPI Transfer</span></label>
+          <label class="radio-card flex items-center gap-3"><input type="radio" name="ret-refund" value="bank" class="accent-brand-700" onchange="toggleRefundFields('bank')"/><span class="text-sm font-500 text-slate-700">Bank Transfer</span></label>
+        </div>
+        <div id="err-ret-refund" class="field-error hidden"></div>
+      </div>
+      <div id="ret-upi-fields" class="hidden space-y-4">
+        <div><label class="bc-label">UPI ID *</label><input id="ret-upi-id" type="text" class="bc-input" placeholder="yourname@upi"/><div id="err-ret-upi" class="field-error hidden"></div></div>
+      </div>
+      <div id="ret-bank-fields" class="hidden space-y-4">
+        <div><label class="bc-label">Account Number *</label><input id="ret-bank-acc" type="text" class="bc-input" placeholder="Account number"/></div>
+        <div><label class="bc-label">IFSC Code *</label><input id="ret-bank-ifsc" type="text" class="bc-input" placeholder="e.g. HDFC0001234"/></div>
+      </div>
+      <label class="flex items-start gap-3 cursor-pointer">
+        <input type="checkbox" id="ret-confirm" class="mt-1 accent-brand-700 w-4 h-4" required/>
+        <span class="text-sm text-slate-600 leading-relaxed">I confirm the item is unused except for inspection, in its original packaging.</span>
+      </label>
+      <div id="err-ret-confirm" class="field-error hidden"></div>
+      <div id="ret-err" class="text-sm text-red-600 font-500 hidden rounded-lg bg-red-50 px-3.5 py-2.5 border border-red-100"></div>
+      <div id="ret-success" class="hidden text-center py-4">
+        <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 check-anim"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <h4 class="font-display text-lg font-700 text-slate-900 mb-1">Return Submitted!</h4>
+        <p class="text-slate-500 text-sm">Our team will contact you within 48 hours.</p>
+        <button type="button" class="btn-secondary mt-5" onclick="closeModal()">Close</button>
+      </div>
+      <button type="submit" id="btn-ret-submit" class="btn-primary w-full"><span id="btn-ret-text">Submit Return Request</span><div id="btn-ret-spinner" class="spinner hidden"></div></button>
+    </form>`;
+  showModal('return');
+}
+
+function toggleRefundFields(type) {
+  document.getElementById('ret-upi-fields').classList.toggle('hidden',type!=='upi');
+  document.getElementById('ret-bank-fields').classList.toggle('hidden',type!=='bank');
+}
+
+async function handleReturnSubmit(e) {
+  e.preventDefault();
+  const btn=document.getElementById('btn-ret-submit');
+  const btnText=document.getElementById('btn-ret-text');
+  const spinner=document.getElementById('btn-ret-spinner');
+  const errEl=document.getElementById('ret-err');
+  errEl.classList.add('hidden');
+  const reason=document.getElementById('ret-reason').value;
+  const details=document.getElementById('ret-details').value;
+  const email=document.getElementById('ret-email').value.trim();
+  const address=document.getElementById('ret-address').value.trim();
+  const confirm=document.getElementById('ret-confirm').checked;
+  const refundMethod=document.querySelector('input[name="ret-refund"]:checked')?.value;
+  const upiId=document.getElementById('ret-upi-id')?.value?.trim();
+  const bankAcc=document.getElementById('ret-bank-acc')?.value?.trim();
+  const bankIfsc=document.getElementById('ret-bank-ifsc')?.value?.trim();
+  let valid=true;
+  const setErr=(id,msg)=>{const el=document.getElementById(id);el.textContent=msg;el.classList.toggle('hidden',!msg);if(msg)valid=false;};
+  setErr('err-ret-reason',!reason?'Please select a reason':'');
+  setErr('err-ret-email',!email?'Please enter contact email':'');
+  setErr('err-ret-address',!address?'Please enter pickup address':'');
+  setErr('err-ret-refund',!refundMethod?'Please choose refund method':'');
+  setErr('err-ret-confirm',!confirm?'Please confirm the checkbox':'');
+  if(refundMethod==='upi') setErr('err-ret-upi',!upiId?'Please enter UPI ID':!/^[\w.\-]+@[\w]+$/.test(upiId)?'Enter valid UPI ID (e.g. name@upi)':'');
+  if(!valid) return;
+  btn.disabled=true; btnText.textContent='Submitting…'; spinner.classList.remove('hidden');
+  try {
+    const imageUrls=await uploadImages(App.uploadedFiles.return);
+    const orderItemId=App._returnItem.id||App._returnItem.order_item_id||null;
+    const customerId=App.session.customerId||null;
+    await submitReturnRequest({
+      ...(orderItemId?{order_item_id:orderItemId}:{}),
+      ...(customerId?{customer_id:customerId}:{}),
+      reason,additional_info:details,
+      product_images:imageUrls.join(','),
+      contact_email:email,
+      pickup_address:address,
+      payee_payment_method:refundMethod,
+      ...(upiId?{payee_upi_id:upiId}:{}),
+      ...(bankAcc?{payee_bank_account_no:bankAcc}:{}),
+      ...(bankIfsc?{payee_bank_ifsc:bankIfsc}:{}),
+    });
+    document.getElementById('return-form').querySelectorAll('button[type=submit],input,select,textarea').forEach(el=>el.disabled=true);
+    document.getElementById('ret-success').classList.remove('hidden');
+    btn.classList.add('hidden');
+    showToast('Return request submitted','success');
+    if(customerId) App.returnRequests=await fetchReturnRequests(customerId);
+  } catch(err) {
+    errEl.textContent=err.message||'Failed to submit. Please try again.'; errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled=false; btnText.textContent='Submit Return Request'; spinner.classList.add('hidden');
+  }
+}
+
+// ─── REPLACE MODAL ────────────────────────────────────────────────────────
+function openReplaceModal(order,item) {
+  if(typeof order==='string') order=JSON.parse(order);
+  if(typeof item==='string')  item=JSON.parse(item);
+  App._replaceOrder=order; App._replaceItem=item; App.uploadedFiles.replace=[]; App._priceDiff=0; App._razorpayPaymentId=null;
+  const imgSrc=item.image||item.image_url||'';
+  const originalPrice=parseFloat(item.price||0);
+  const productOptions=App.allProducts.map(p=>`<option value="${p.id}" data-price="${p.price}">${p.name} — ${fmt.price(p.price)}</option>`).join('');
+  document.getElementById('replace-modal-content').innerHTML=`
+    <div class="flex gap-4 p-4 bg-slate-50 rounded-xl mb-6">
+      ${imgSrc?`<img src="${imgSrc}" alt="" class="w-14 h-14 rounded-lg object-cover flex-shrink-0"/>`:'<div class="w-14 h-14 rounded-lg bg-slate-200 flex-shrink-0"></div>'}
+      <div class="min-w-0"><div class="font-600 text-slate-900 text-sm truncate">${item.title||item.name||'Product'}</div>${item.variant_title||item.variant?`<div class="text-xs text-slate-500 mt-0.5">${item.variant_title||item.variant}</div>`:''}<div class="text-sm font-600 text-slate-700 mt-1">Original Price: ${fmt.price(originalPrice)}</div></div>
+    </div>
+    <form id="replace-form" class="space-y-5" onsubmit="handleReplaceSubmit(event)">
+      <div>
+        <label class="bc-label">Replacement Type *</label>
+        <div class="space-y-2.5">
+          <label class="radio-card flex items-center gap-3"><input type="radio" name="rep-type" value="same"      class="accent-brand-700" checked onchange="toggleReplaceProduct('same')"      required/><span class="text-sm font-500 text-slate-700">Same product</span></label>
+          <label class="radio-card flex items-center gap-3"><input type="radio" name="rep-type" value="different" class="accent-brand-700"       onchange="toggleReplaceProduct('different')"/><span class="text-sm font-500 text-slate-700">Different product / variant</span></label>
+        </div>
+      </div>
+      <div id="rep-product-select" class="hidden">
+        <label class="bc-label">Select Replacement Product *</label>
+        <select id="rep-product" class="bc-input" onchange="updatePriceDiff(${originalPrice})"><option value="">Choose product…</option>${productOptions}</select>
+      </div>
+      <div id="rep-price-info" class="hidden rounded-xl p-4 border text-sm font-500"></div>
+      <div id="rep-payment-section" class="hidden">
+        <div class="bg-brand-50 border border-brand-100 rounded-xl p-4 mb-3">
+          <div class="flex items-center gap-2 text-brand-700 font-600 text-sm mb-1"><svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>Additional Payment Required</div>
+          <p class="text-xs text-brand-600">Complete payment to proceed with replacement. Secured by Razorpay.</p>
+        </div>
+        <button type="button" id="btn-pay" class="btn-primary w-full" onclick="handleRazorpayPayment()">Pay <span id="pay-amount-label"></span> with Razorpay</button>
+        <div id="payment-done-badge" class="hidden mt-3 flex items-center gap-2 text-green-700 text-sm font-600 bg-green-50 rounded-xl p-3">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+          Payment successful — <span id="payment-id-display"></span>
+        </div>
+      </div>
+      <div id="rep-refund-section" class="hidden space-y-3">
+        <div class="bg-green-50 border border-green-100 rounded-xl p-4"><div class="text-green-700 font-600 text-sm mb-0.5">Refund After Pickup</div><div class="text-xs text-green-600">Amount will be refunded once item is picked up.</div></div>
+        <label class="bc-label">Refund Method *</label>
+        <div class="space-y-2.5">
+          <label class="radio-card flex items-center gap-3"><input type="radio" name="rep-refund" value="upi"  class="accent-brand-700" onchange="toggleRepRefundFields('upi')"  required/><span class="text-sm font-500 text-slate-700">UPI Transfer</span></label>
+          <label class="radio-card flex items-center gap-3"><input type="radio" name="rep-refund" value="bank" class="accent-brand-700" onchange="toggleRepRefundFields('bank')"/><span class="text-sm font-500 text-slate-700">Bank Transfer</span></label>
+        </div>
+        <div id="rep-upi-fields" class="hidden"><label class="bc-label">UPI ID *</label><input id="rep-upi-id" type="text" class="bc-input" placeholder="yourname@upi"/></div>
+        <div id="rep-bank-fields" class="hidden space-y-3">
+          <div><label class="bc-label">Account Number *</label><input id="rep-bank-acc" type="text" class="bc-input" placeholder="Account number"/></div>
+          <div><label class="bc-label">IFSC Code *</label><input id="rep-bank-ifsc" type="text" class="bc-input" placeholder="e.g. HDFC0001234"/></div>
+        </div>
+      </div>
+      <div>
+        <label class="bc-label">Reason for Replacement *</label>
+        <select id="rep-reason" class="bc-input" required><option value="">Select a reason…</option><option>Damaged item</option><option>Wrong item received</option><option>Missing parts</option><option>Defective product</option><option>Wanting different variant</option><option>Other</option></select>
+      </div>
+      <div>
+        <label class="bc-label">Upload Product Photos</label>
+        <div class="dropzone" onclick="document.getElementById('rep-file-input').click()" ondragover="handleDragOver(event)" ondragleave="handleDragLeave(event)" ondrop="handleFileDrop(event,'replace')">
+          <div class="flex flex-col items-center gap-2 text-slate-400 pointer-events-none"><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg><span class="text-sm font-500">Drag photos or <span class="text-brand-600">browse</span></span></div>
+        </div>
+        <input type="file" id="rep-file-input" accept="image/*" multiple class="hidden" onchange="handleFileSelect(event,'replace')"/>
+        <div id="rep-thumbs" class="flex gap-2 flex-wrap mt-2"></div>
+      </div>
+      <div><label class="bc-label">Additional Notes</label><textarea id="rep-details" class="bc-input" rows="2" placeholder="Any additional information…"></textarea></div>
+      <div>
+        <label class="bc-label">Contact Email *</label>
+        <input id="rep-email" type="email" class="bc-input" value="${App.session?.email||''}" required/>
+        <div id="err-rep-email" class="field-error hidden"></div>
+      </div>
+      <div>
+        <label class="bc-label">Pickup Address *</label>
+        <textarea id="rep-address" class="bc-input" rows="2" placeholder="Full address for pickup…" required></textarea>
+        <div id="err-rep-address" class="field-error hidden"></div>
+      </div>
+      <div id="rep-err" class="text-sm text-red-600 font-500 hidden rounded-lg bg-red-50 px-3.5 py-2.5 border border-red-100"></div>
+      <div id="rep-success" class="hidden text-center py-4">
+        <div class="w-14 h-14 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4 check-anim"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#16a34a" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+        <h4 class="font-display text-lg font-700 text-slate-900 mb-1">Replacement Requested!</h4>
+        <p class="text-slate-500 text-sm">Our team will contact you within 48 hours.</p>
+        <button type="button" class="btn-secondary mt-5" onclick="closeModal()">Close</button>
+      </div>
+      <button type="submit" id="btn-rep-submit" class="btn-primary w-full"><span id="btn-rep-text">Submit Replacement Request</span><div id="btn-rep-spinner" class="spinner hidden"></div></button>
+    </form>`;
+  showModal('replace');
+}
+
+function toggleReplaceProduct(type) {
+  document.getElementById('rep-product-select').classList.toggle('hidden',type!=='different');
+  document.getElementById('rep-price-info').classList.add('hidden');
+  document.getElementById('rep-payment-section').classList.add('hidden');
+  document.getElementById('rep-refund-section').classList.add('hidden');
+  App._priceDiff=0; App._razorpayPaymentId=null;
+}
+
+function updatePriceDiff(originalPrice) {
+  const sel=document.getElementById('rep-product');
+  const opt=sel.options[sel.selectedIndex];
+  if(!opt||!opt.value) return;
+  const newPrice=parseFloat(opt.dataset.price||0);
+  const diff=newPrice-originalPrice;
+  App._priceDiff=diff; App._razorpayPaymentId=null;
+  const infoEl=document.getElementById('rep-price-info');
+  const payEl=document.getElementById('rep-payment-section');
+  const refEl=document.getElementById('rep-refund-section');
+  infoEl.classList.remove('hidden');
+  if(diff>0){
+    infoEl.className='rounded-xl p-4 border text-sm font-500 bg-amber-50 border-amber-100 text-amber-800';
+    infoEl.innerHTML=`Additional payment required: <strong>${fmt.price(diff)}</strong> (new item costs more)`;
+    document.getElementById('pay-amount-label').textContent=fmt.price(diff);
+    payEl.classList.remove('hidden'); refEl.classList.add('hidden');
+  } else if(diff<0){
+    infoEl.className='rounded-xl p-4 border text-sm font-500 bg-green-50 border-green-100 text-green-800';
+    infoEl.innerHTML=`You'll receive a refund of <strong>${fmt.price(Math.abs(diff))}</strong> after pickup approval`;
+    payEl.classList.add('hidden'); refEl.classList.remove('hidden');
+  } else {
+    infoEl.className='rounded-xl p-4 border text-sm font-500 bg-slate-50 border-slate-200 text-slate-600';
+    infoEl.innerHTML='Same price — no payment or refund needed';
+    payEl.classList.add('hidden'); refEl.classList.add('hidden');
+  }
+}
+
+function toggleRepRefundFields(type) {
+  document.getElementById('rep-upi-fields').classList.toggle('hidden',type!=='upi');
+  document.getElementById('rep-bank-fields').classList.toggle('hidden',type!=='bank');
+}
+
+async function handleRazorpayPayment() {
+  const diff=App._priceDiff;
+  if(diff<=0) return;
+  const btn=document.getElementById('btn-pay');
+  btn.disabled=true; btn.textContent='Loading…';
+  try {
+    let razorpayOrderId=null;
+    try {
+      // Pass rupees — API converts to paise
+      const rzpOrder=await createRazorpayOrder(diff);
+      razorpayOrderId=rzpOrder.id;
+    } catch(e) { console.warn('Could not create Razorpay order server-side'); }
+
+    const options={
+      key:CONFIG.RAZORPAY_KEY_ID,
+      amount:Math.round(diff*100), // paise for Razorpay SDK
+      currency:'INR',
+      name:'Breakfastclub',
+      description:'Replacement Upgrade Payment',
+      ...(razorpayOrderId?{order_id:razorpayOrderId}:{}),
+      handler(response){
+        App._razorpayPaymentId=response.razorpay_payment_id;
+        document.getElementById('btn-pay').classList.add('hidden');
+        document.getElementById('payment-done-badge').classList.remove('hidden');
+        document.getElementById('payment-id-display').textContent=response.razorpay_payment_id;
+        showToast('Payment successful!','success');
+      },
+      prefill:{ email:App.session?.email||'' },
+      theme:{ color:'#1d4ed8' },
+      modal:{ ondismiss(){ btn.disabled=false; btn.innerHTML=`Pay ${fmt.price(diff)} with Razorpay`; } },
+    };
+    if(typeof Razorpay==='undefined'){showToast('Payment gateway unavailable. Please try again.','error');btn.disabled=false;return;}
+    new Razorpay(options).open();
+  } catch(err) {
+    showToast(err.message||'Payment failed','error');
+    btn.disabled=false;
+    btn.innerHTML=`Pay ${fmt.price(diff)} with Razorpay`;
+  }
+}
+
+async function handleReplaceSubmit(e) {
+  e.preventDefault();
+  const errEl=document.getElementById('rep-err');
+  errEl.classList.add('hidden');
+  const repType=document.querySelector('input[name="rep-type"]:checked')?.value;
+  const reason=document.getElementById('rep-reason').value;
+  const email=document.getElementById('rep-email').value.trim();
+  const address=document.getElementById('rep-address').value.trim();
+  const details=document.getElementById('rep-details').value;
+  let valid=true;
+  const setErr=(id,msg)=>{const el=document.getElementById(id);if(!el)return;el.textContent=msg;el.classList.toggle('hidden',!msg);if(msg)valid=false;};
+  setErr('err-rep-email',!email?'Please enter contact email':'');
+  setErr('err-rep-address',!address?'Please enter pickup address':'');
+  if(!reason){errEl.textContent='Please select a reason';errEl.classList.remove('hidden');return;}
+  if(!valid) return;
+  let replacementProductId=null;
+  if(repType==='different'){
+    replacementProductId=document.getElementById('rep-product').value;
+    if(!replacementProductId){errEl.textContent='Please select a replacement product';errEl.classList.remove('hidden');return;}
+  }
+  if(App._priceDiff>0&&!App._razorpayPaymentId){errEl.textContent='Please complete the payment to proceed';errEl.classList.remove('hidden');return;}
+  const btn=document.getElementById('btn-rep-submit');
+  const btnText=document.getElementById('btn-rep-text');
+  const spinner=document.getElementById('btn-rep-spinner');
+  btn.disabled=true; btnText.textContent='Submitting…'; spinner.classList.remove('hidden');
+  try {
+    const imageUrls=await uploadImages(App.uploadedFiles.replace);
+    const orderItemId=App._replaceItem.id||App._replaceItem.order_item_id||null;
+    const customerId=App.session.customerId||null;
+    const refundMethod=document.querySelector('input[name="rep-refund"]:checked')?.value;
+    const repUpiId=document.getElementById('rep-upi-id')?.value?.trim();
+    const repBankAcc=document.getElementById('rep-bank-acc')?.value?.trim();
+    const repBankIfsc=document.getElementById('rep-bank-ifsc')?.value?.trim();
+    await submitReplacementRequest({
+      ...(orderItemId?{order_item_id:orderItemId}:{}),
+      ...(customerId?{customer_id:customerId}:{}),
+      reason,additional_info:details,
+      product_images:imageUrls,
+      contact_email:email,
+      pickup_address:{address,city:'',pincode:'',landmark:''},
+      ...(replacementProductId?{replacement_product_id:replacementProductId}:{}),
+      price_difference:App._priceDiff||0,
+      ...(App._razorpayPaymentId?{payee_rzp_payment_id:App._razorpayPaymentId}:{}),
+      ...(App._priceDiff>0&&App._razorpayPaymentId?{payee_payment_method:['razorpay']}:{}),
+      ...(App._priceDiff<0&&refundMethod?{payer_payment_method:refundMethod}:{}),
+      ...(repUpiId?{payee_upi_id:repUpiId}:{}),
+      ...(repBankAcc?{payee_bank_account_no:repBankAcc}:{}),
+      ...(repBankIfsc?{payee_bank_ifsc:repBankIfsc}:{}),
+    });
+    document.getElementById('rep-success').classList.remove('hidden');
+    btn.classList.add('hidden');
+    showToast('Replacement request submitted','success');
+    if(customerId) App.replacementRequests=await fetchReplacementRequests(customerId);
+  } catch(err) {
+    errEl.textContent=err.message||'Failed to submit. Please try again.'; errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled=false; btnText.textContent='Submit Replacement Request'; spinner.classList.add('hidden');
+  }
+}
+
+// ─── CANCEL MODAL ─────────────────────────────────────────────────────────
+function openCancelModal(order) {
+  if(typeof order==='string') order=JSON.parse(order);
+  App._cancelOrder=order;
+  document.getElementById('cancel-modal-content').innerHTML=`
+    <div class="flex items-center justify-between mb-6">
+      <h3 class="font-display text-xl font-700 text-slate-900">Cancel Order?</h3>
+      <button class="w-8 h-8 rounded-lg hover:bg-slate-100 flex items-center justify-center transition-colors" onclick="closeModal()"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><path d="M18 6 6 18"/><path d="m6 6 12 12"/></svg></button>
+    </div>
+    <div class="bg-red-50 border border-red-100 rounded-xl p-4 mb-6">
+      <div class="text-sm text-red-800 font-500">Are you sure you want to cancel order <strong>${fmt.orderId(order.order_name||order.shopify_order_id)}</strong>? This action cannot be undone.</div>
+    </div>
+    <div class="mb-5">
+      <label class="bc-label">Reason for Cancellation</label>
+      <div class="space-y-2.5">
+        ${['Ordered by mistake','Found a cheaper option','Delivery delay','Changed my mind','Other'].map(r=>`<label class="radio-card flex items-center gap-3"><input type="radio" name="cancel-reason" value="${r}" class="accent-brand-700"/><span class="text-sm font-500 text-slate-700">${r}</span></label>`).join('')}
+      </div>
+    </div>
+    <div id="cancel-err" class="text-sm text-red-600 font-500 hidden rounded-lg bg-red-50 px-3.5 py-2.5 border border-red-100 mb-4"></div>
+    <div id="cancel-success" class="hidden text-center py-4">
+      <div class="w-14 h-14 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 check-anim"><svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="#dc2626" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg></div>
+      <h4 class="font-display text-lg font-700 text-slate-900 mb-1">Order Cancelled</h4>
+      <p class="text-slate-500 text-sm">Your order has been successfully cancelled.</p>
+      <button class="btn-secondary mt-5" onclick="closeModal();loadDashboard()">Done</button>
+    </div>
+    <div id="cancel-actions" class="flex gap-3 mt-2">
+      <button class="btn-secondary flex-1" onclick="closeModal()">Keep Order</button>
+      <button id="btn-confirm-cancel" class="btn-primary flex-1" style="background:#dc2626" onclick="handleConfirmCancel()">
+        <span id="btn-cancel-text">Confirm Cancel</span><div id="btn-cancel-spinner" class="spinner hidden"></div>
+      </button>
+    </div>`;
+  showModal('cancel');
+}
+
+async function handleConfirmCancel() {
+  const errEl=document.getElementById('cancel-err');
+  const btn=document.getElementById('btn-confirm-cancel');
+  const btnText=document.getElementById('btn-cancel-text');
+  const spinner=document.getElementById('btn-cancel-spinner');
+  const reason=document.querySelector('input[name="cancel-reason"]:checked')?.value||'Not specified';
+  btn.disabled=true; btnText.textContent='Cancelling…'; spinner.classList.remove('hidden');
+  errEl.classList.add('hidden');
+  try {
+    await apiPost('/api/cancel-order',{
+      orderId:App._cancelOrder.shopify_order_id,
+      orderName:App._cancelOrder.order_name,
+      reason,sessionToken:App.session?.sessionToken,
+    });
+    document.getElementById('cancel-success').classList.remove('hidden');
+    document.getElementById('cancel-actions').classList.add('hidden');
+    showToast('Order cancelled successfully','success');
+    const idx=App.orders.findIndex(o=>o.shopify_order_id===App._cancelOrder.shopify_order_id);
+    if(idx!==-1){App.orders[idx].status='cancelled';renderOrders();}
+  } catch(err) {
+    errEl.textContent=err.message||'Failed to cancel order. Please contact support.'; errEl.classList.remove('hidden');
+  } finally {
+    btn.disabled=false; btnText.textContent='Confirm Cancel'; spinner.classList.add('hidden');
+  }
+}
+
+// ─── FILE UPLOAD ──────────────────────────────────────────────────────────
+function handleFileSelect(e,type) { addFiles(Array.from(e.target.files),type); e.target.value=''; }
+function handleFileDrop(e,type)   { e.preventDefault(); e.currentTarget.classList.remove('drag-over'); addFiles(Array.from(e.dataTransfer.files).filter(f=>f.type.startsWith('image/')),type); }
+function handleDragOver(e)  { e.preventDefault(); e.currentTarget.classList.add('drag-over'); }
+function handleDragLeave(e) { e.currentTarget.classList.remove('drag-over'); }
+function addFiles(files,type) { const MAX=5; const ex=App.uploadedFiles[type]; App.uploadedFiles[type]=[...ex,...files.slice(0,MAX-ex.length)]; renderThumbs(type); }
+function renderThumbs(type) {
+  const prefix=type==='return'?'ret':'rep';
+  const container=document.getElementById(`${prefix}-thumbs`);
+  if(!container) return;
+  container.innerHTML=App.uploadedFiles[type].map((f,i)=>`<div class="relative"><img src="${URL.createObjectURL(f)}" class="thumb-preview"/><button type="button" onclick="removeFile(${i},'${type}')" class="absolute -top-1.5 -right-1.5 w-5 h-5 bg-red-500 text-white rounded-full flex items-center justify-center text-xs leading-none hover:bg-red-600">×</button></div>`).join('');
+}
+function removeFile(idx,type) { App.uploadedFiles[type].splice(idx,1); renderThumbs(type); }
+
+// ─── MISC ─────────────────────────────────────────────────────────────────
+function openInvoice(shopifyOrderId) { window.open(`${CONFIG.API_BASE}/api/invoice/${shopifyOrderId}`,'_blank'); }
+function buyAgain()                  { window.open('https://breakfastclub.co.in','_blank'); }
+
+function handleLogout() {
+  sessionStorage.removeItem('bc_session');
+  App.session=null; App.orders=[];
+  document.getElementById('active-banner').classList.add('hidden');
+  document.getElementById('inp-order-id').value='';
+  document.getElementById('inp-email').value='';
+  showState('login');
+  showToast('Logged out successfully');
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────
+async function init() {
+  await loadConfigFromServer();
+  initServices();
+  // Restore session if valid (uses email, not phone)
+  if (App.session && App.session.email) {
+    loadDashboard();
+  } else {
+    showState('login');
+  }
+}
+
+if(document.readyState==='loading'){
+  document.addEventListener('DOMContentLoaded',init);
+} else {
+  init();
+}
+</script>
+</body>
+</html>
